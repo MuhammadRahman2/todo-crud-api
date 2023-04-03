@@ -2,16 +2,39 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:todo_api/utils/utils.dart';
 
-class AddTodo extends StatelessWidget {
-  AddTodo({super.key});
+class AddTodo extends StatefulWidget {
+  final Map? item;
+
+  AddTodo({super.key, this.item});
+
+  @override
+  State<AddTodo> createState() => _AddTodoState();
+}
+
+class _AddTodoState extends State<AddTodo> {
+  bool isEdit = false;
+
   TextEditingController titleController = TextEditingController();
   TextEditingController descriptionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    if (item != null) {
+      isEdit = true;
+      titleController.text = item['title'];
+      descriptionController.text = item['description'];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('add data'),
+        title: Text(isEdit ? 'update data' : 'add data'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -27,7 +50,6 @@ class AddTodo extends StatelessWidget {
               controller: descriptionController,
               minLines: 3,
               maxLines: 4,
-              
               keyboardType: TextInputType.multiline,
               decoration: const InputDecoration(
                 hintText: 'description',
@@ -40,17 +62,48 @@ class AddTodo extends StatelessWidget {
               height: 50,
               child: ElevatedButton(
                   onPressed: () {
-                    postData(context).then((value) {
-                      titleController.clear();
-                      descriptionController.clear();
-                    });
+                    isEdit
+                        ? PutData().then((value) => Navigator.pop(context))
+                        : postData(context).then((value) {
+                            titleController.clear();
+                            descriptionController.clear();
+                            Navigator.pop(context);
+                          });
                   },
-                  child: const Text('Add Data')),
+                  child: Text(isEdit ? 'Update' : 'Add Data')),
             )
           ],
         ),
       ),
     );
+  }
+
+  Future<void> PutData() async {
+    final item = widget.item;
+    if (item == null) {
+      print('you can not call update with out item');
+      return;
+    }
+    final id = item['_id'];
+    var title = titleController.text;
+    var description = descriptionController.text;
+    final body = {
+      'title': title,
+      'description': description,
+      "is_completed": false
+    };
+    final url = 'https://api.nstack.in/v1/todos/$id';
+    final uri = Uri.parse(url);
+    final reponse = await http.put(uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body));
+    if (reponse.statusCode == 200) {
+      Utils.showMassage(context, 'update is Success');
+    } else {
+      Utils.showMassageError(context, 'update Failed');
+    }
   }
 
   Future<void> postData(
@@ -64,7 +117,6 @@ class AddTodo extends StatelessWidget {
       'description': description,
       "is_completed": false
     };
-
     // add data to api
     const baseUrl = 'https://api.nstack.in/v1/todos';
     final uri = Uri.parse(baseUrl);
@@ -73,24 +125,12 @@ class AddTodo extends StatelessWidget {
           'Content-Type': 'application/json',
         },
         body: jsonEncode(body));
+
     if (response.statusCode == 201) {
-      // print('S');
-      showMassage(context, 'Create is Success');
+     Utils.showMassage(context, 'Create is Success');
     } else {
-      showMassageError(context, 'Creation Failed');
+      Utils.showMassageError(context, 'Creation Failed');
     }
     // show message success or fail
-  }
-
- void showMassage(BuildContext context, String value) {
-    final snacker = SnackBar(content: Text(value));
-    ScaffoldMessenger.of(context).showSnackBar(snacker);
-  }
-
-  void showMassageError(BuildContext context, String value) {
-    final snacker = SnackBar(
-      backgroundColor: Colors.red,
-      content: Text(value,style: const TextStyle(color: Colors.white),));
-    ScaffoldMessenger.of(context).showSnackBar(snacker,);
   }
 }
