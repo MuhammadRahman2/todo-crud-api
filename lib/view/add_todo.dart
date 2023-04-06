@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:todo_api/services/item_services.dart';
 import 'package:todo_api/utils/utils.dart';
 
 class AddTodo extends StatefulWidget {
@@ -92,14 +93,8 @@ class _AddTodoState extends State<AddTodo> {
       'description': description,
       "is_completed": false
     };
-    final url = 'https://api.nstack.in/v1/todos/$id';
-    final uri = Uri.parse(url);
-    final reponse = await http.put(uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(body));
-    if (reponse.statusCode == 200) {
+    final isSuccess = await ItemServices.updateById(id, body);
+    if (isSuccess) {
       Utils.showMassage(context, 'update is Success');
     } else {
       Utils.showMassageError(context, 'update Failed');
@@ -118,16 +113,10 @@ class _AddTodoState extends State<AddTodo> {
       "is_completed": false
     };
     // add data to api
-    const baseUrl = 'https://api.nstack.in/v1/todos';
-    final uri = Uri.parse(baseUrl);
-    final response = await http.post(uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(body));
-
-    if (response.statusCode == 201) {
-     Utils.showMassage(context, 'Create is Success');
+    final isSuccess =await ItemServices.addData(body);
+    if (isSuccess) {
+      // print('S');
+      Utils.showMassage(context, 'Create is Success');
     } else {
       Utils.showMassageError(context, 'Creation Failed');
     }

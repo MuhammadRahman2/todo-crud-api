@@ -1,9 +1,10 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:todo_api/services/item_services.dart';
 import 'package:todo_api/utils/utils.dart';
 import 'package:todo_api/view/add_todo.dart';
 import 'package:http/http.dart' as http;
+import 'package:todo_api/widget/item_card.dart';
 
 class TodoHomePage extends StatefulWidget {
   const TodoHomePage({super.key});
@@ -27,47 +28,36 @@ class _TodoHomePageState extends State<TodoHomePage> {
       appBar: AppBar(
         title: const Text('Todo'),
       ),
-      body: RefreshIndicator(
-        onRefresh: fetchData,
-        child: ListView.builder(
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index] as Map;
-            final id = item['_id'];
-            return ListTile(
-              leading: CircleAvatar(child: Text('${index + 1}')),
-              title: Text(item['title']),
-              subtitle: Text(item['description']),
-              trailing: PopupMenuButton(
-                onSelected: (value) {
-                  if (value == 'update') {
-                    // open update page
-                    navigateScreen(context, AddTodo(item: item));
-                  } else if (value == 'delete') {
-                    // open delete page
-                    deleteData(id);
-                  }
-                },
-                itemBuilder: (context) {
-                  return [
-                    const PopupMenuItem(
-                      value: 'update',
-                      child: Text('update'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text('delete'),
-                    ),
-                  ];
-                },
-              ),
-            );
-          },
+      body: Visibility(
+        visible: isLoading,
+        replacement: RefreshIndicator(
+          onRefresh: fetchData,
+          child: Visibility(
+            visible: items.isNotEmpty,
+            replacement: const Center(
+              child: Text('No Todo Item'),
+            ),
+            child: ListView.builder(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index] as Map;
+                final id = item['_id'];
+                return ItemCard(
+                  item: item, 
+                  index: index, 
+                  navigateEditItemPage: navigateEditScreen, 
+                  delelteById:  deleteData,);
+              },
+            ),
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          navigateScreen(context, AddTodo());
+          navigateAddScreen();
         },
         label: const Text('Add Todo'),
       ),
@@ -75,29 +65,24 @@ class _TodoHomePageState extends State<TodoHomePage> {
   }
 
   Future<void> fetchData() async {
-    const url = 'https://api.nstack.in/v1/todos?page=1&limit=10';
-    final uri = Uri.parse(url);
-    final respone = await http.get(uri);
-    if (respone.statusCode == 200) {
-      final json = jsonDecode(respone.body);
-      final result = json['items'] as List;
-      // items.map((e) {
+    final respone = await ItemServices.fetchItemData(context);
+    if (respone != null) {
       setState(() {
-        items = result;
+        items = respone;
       });
     } else {
       Utils.showMassageError(context, 'Creating is failed');
     }
+    setState(() {
+      isLoading = false;
+    });
     // print(respone.body);
   }
 
   Future<void> deleteData(String id) async {
     // delete item
-    // https://api.nstack.in/v1/todos/642a891e26d47c915250ad7e
-    final url = 'https://api.nstack.in/v1/todos/$id';
-    final uri = Uri.parse(url);
-    final respone = await http.delete(uri);
-    if (respone.statusCode == 200) {
+    final isSucces = await ItemServices.deleteById(id);
+    if (isSucces) {
       Utils.showMassage(context, 'Delete Success');
 
       // delete item form list
@@ -108,11 +93,19 @@ class _TodoHomePageState extends State<TodoHomePage> {
     } else {
       Utils.showMassageError(context, 'delete Failed');
     }
-    isLoading = false;
   }
 
-  Future<void> navigateScreen(BuildContext context, dynamic page) async {
-    final route = MaterialPageRoute(builder: (context) => page);
+  Future<void> navigateAddScreen() async {
+    final route = MaterialPageRoute(builder: (context) => AddTodo());
+    await Navigator.push(context, route);
+    setState(() {
+      isLoading = true;
+    });
+    fetchData();
+  }
+
+  Future<void> navigateEditScreen(Map mapItem) async {
+    final route = MaterialPageRoute(builder: (context) => AddTodo(item: mapItem));
     await Navigator.push(context, route);
     setState(() {
       isLoading = true;
